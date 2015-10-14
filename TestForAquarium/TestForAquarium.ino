@@ -5,17 +5,17 @@
 #include <LDateTime.h>
 #define BAUDRATE 19200
 
-#define WIFI_NAME "SoCLab" // 填入WiFi AP網路名稱SSID
-#define WIFI_PASSWD "0975510161" // 填入密碼
-#define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
+#define WIFI_NAME "SoCLab" //填入WiFi AP網路名稱SSID
+#define WIFI_PASSWD "0975510161" //填入密碼
+#define WIFI_AUTH LWIFI_WPA  //choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
 #define URL "ec2-52-88-134-169.us-west-2.compute.amazonaws.com" 
-LWiFiClient cli; // 客戶端
+LWiFiClient cli; //客戶端
 datetimeInfo t;
 char buff[256];
-
 const int SLAVE_ADDRESS = 4; 
 byte incomingByte = 0;
 
+//transfer temp byte data
 typedef union Data {
   float f_data;
   unsigned char b_data[4];
@@ -29,6 +29,7 @@ void setup(){
   LWiFi.begin();
   Serial.begin(BAUDRATE);
   while(!Serial);
+  // def. time setting
   t.year = 2015;
   t.mon = 10;
   t.day = 14;
@@ -36,8 +37,9 @@ void setup(){
   t.min = 00;
   t.sec = 00;
   LDateTime.setTime(&t);
-  //keep retrying until connected to AP
+  
   Serial.println("Connecting to AP");
+  // keep retrying until connected to AP
   while(0 == LWiFi.connect(WIFI_NAME, LWiFiLoginInfo(WIFI_AUTH, WIFI_PASSWD))){
     Serial.println("delay..");
     delay(1000);
@@ -46,7 +48,8 @@ void setup(){
 
 void post(float temp){
   LDateTime.getTime(&t);
-  sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":1,\"temp\":\"%f\"}]", t.year, t.mon, t.day, t.hour, t.min, t.sec, temp);
+  sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":1,\"temp\":\"%f\"}]", 
+          t.year, t.mon, t.day, t.hour, t.min, t.sec, temp);
   Serial.println("Connecting to website...");
   String str(buff);
   String data = buff;
@@ -62,7 +65,6 @@ void post(float temp){
       cli.println("Content-Length: " + thisLength);
       cli.println();
       cli.println(data);
-      
       char x = cli.read(); // 讀取
       if(x > 0){
         Serial.print((char) x); // 印出到序列埠
@@ -100,34 +102,36 @@ void loop() {
     incomingByte = Wire.read();
     Serial.println(incomingByte);       
   }
-//delay(1000);
+  delay(1000);
+  
   //motor
-  //Wire.beginTransmission(SLAVE_ADDRESS);
-  //Wire.write(2);
-  //Wire.write(1);
-  //Wire.write(1);
-  //Wire.write(1);
-  //Wire.write(255);
-  //Wire.endTransmission();
-  //Wire.requestFrom(SLAVE_ADDRESS, 1);
-  //while (Wire.available())
-  //{
-    //incomingByte = Wire.read();
-    //Serial.println(incomingByte);       
-  //}
   
-  //Wire.beginTransmission(SLAVE_ADDRESS);
-  //Wire.write(255);
-  //Wire.endTransmission();
-  //Wire.requestFrom(SLAVE_ADDRESS, 1);
-  //while (Wire.available())
-  //{
-    //incomingByte = Wire.read();
-    //Serial.println(incomingByte);       
-  //}
-//delay(1000);
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(2);
+  Wire.write(1);
+  Wire.write(1);
+  Wire.write(1);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
   
- //temp
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
+  delay(1000);
+  
+  //temp
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(1);
   Wire.write(6);
@@ -198,10 +202,9 @@ void loop() {
     Serial.println(incomingByte);
     Serial.println("#####################");       
   }
-  
   delay(1000);
  
- //
+  //
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);//set
   Wire.write(5);//device
@@ -229,6 +232,7 @@ void loop() {
   }
   delay(3000);
   
+  //
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(5);
@@ -256,7 +260,7 @@ void loop() {
   }
   delay(3000);
   
-  
+  //
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(4);
@@ -284,6 +288,7 @@ void loop() {
   }
   delay(2000);
   
+  //
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(4);
@@ -309,6 +314,5 @@ void loop() {
     incomingByte = Wire.read();
     Serial.println(incomingByte);       
   }
-  delay(2000);
-  
+  delay(2000); 
 }
