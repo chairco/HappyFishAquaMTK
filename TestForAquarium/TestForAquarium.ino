@@ -155,7 +155,7 @@ void loop() {
     ph_data = incomingByte;       
   }
   //*post data to server*
-  post(ph_data, 0);
+  post(ph_data, 3);
 
   //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
