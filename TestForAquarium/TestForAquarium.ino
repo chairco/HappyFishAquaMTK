@@ -14,6 +14,7 @@ datetimeInfo t;
 char buff[256];
 const int SLAVE_ADDRESS = 4; 
 byte incomingByte = 0;
+float ph_data;
 
 //transfer temp byte data
 typedef union Data {
@@ -21,7 +22,6 @@ typedef union Data {
   unsigned char b_data[4];
 }Data;
 Data temp_data;
-Data ph_data;
 
 void setup(){
   // put your setup code here, to run once:
@@ -152,41 +152,10 @@ void loop() {
   {
     incomingByte = Wire.read();
     Serial.println(incomingByte);
-    ph_data.b_data[0] = incomingByte;       
+    ph_data = incomingByte;       
   }
-  Wire.beginTransmission(SLAVE_ADDRESS);
-  Wire.write(255);
-  Wire.endTransmission();
-  Wire.requestFrom(SLAVE_ADDRESS, 1);
-  while (Wire.available())
-  {
-    incomingByte = Wire.read();
-    Serial.println(incomingByte);
-    ph_data.b_data[1] = incomingByte;       
-  }
-  Wire.beginTransmission(SLAVE_ADDRESS);
-  Wire.write(255);
-  Wire.endTransmission();
-  Wire.requestFrom(SLAVE_ADDRESS, 1);
-  while (Wire.available())
-  {
-    incomingByte = Wire.read();
-    Serial.println(incomingByte);
-    ph_data.b_data[2] = incomingByte;       
-  }
-  Wire.beginTransmission(SLAVE_ADDRESS);
-  Wire.write(255);
-  Wire.endTransmission();
-  Wire.requestFrom(SLAVE_ADDRESS, 1);
-  while (Wire.available())
-  {
-    incomingByte = Wire.read();
-    Serial.println(incomingByte);
-    ph_data.b_data[3] = incomingByte;       
-  }
-  Serial.println(ph_data.f_data);
-  //post data to server
-  //post(ph_data.f_data);
+  //*post data to server*
+  //post(ph_data);
 
   //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
