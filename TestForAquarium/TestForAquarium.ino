@@ -48,10 +48,10 @@ void setup(){
 }
 
 //HERE is post data to Amazon ec2
-void post(float temp){
+void post(float temp, int model){
   LDateTime.getTime(&t);
-  sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":1,\"temp\":\"%f\"}]", 
-          t.year, t.mon, t.day, t.hour, t.min, t.sec, temp);
+  sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":%d,\"temp\":\"%f\"}]", 
+          t.year, t.mon, t.day, t.hour, t.min, t.sec, model, temp);
   Serial.println("Connecting to website...");
   String str(buff);
   String data = buff;
@@ -155,7 +155,7 @@ void loop() {
     ph_data = incomingByte;       
   }
   //*post data to server*
-  //post(ph_data);
+  post(ph_data, 0);
 
   //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
@@ -225,7 +225,7 @@ void loop() {
   }
   Serial.println(temp_data.f_data);
   //post data to server
-  post(temp_data.f_data);
+  post(temp_data.f_data, 1);
 
   //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
