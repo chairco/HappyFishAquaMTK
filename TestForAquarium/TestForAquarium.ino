@@ -21,6 +21,7 @@ typedef union Data {
   unsigned char b_data[4];
 }Data;
 Data temp_data;
+Data ph_data;
 
 void setup(){
   // put your setup code here, to run once:
@@ -46,6 +47,7 @@ void setup(){
   }
 }
 
+//HERE is post data to Amazon ec2
 void post(float temp){
   LDateTime.getTime(&t);
   sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":1,\"temp\":\"%f\"}]", 
@@ -77,7 +79,6 @@ void post(float temp){
 }
 
 void loop() {
-  //要求slave回傳溫度值
   //fog
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
@@ -105,7 +106,6 @@ void loop() {
   delay(1000);
   
   //motor
-  
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(1);
@@ -130,8 +130,78 @@ void loop() {
     Serial.println(incomingByte);       
   }
   delay(1000);
-  
-  //temp
+
+  //ph
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(1);
+  Wire.write(9);
+  Wire.write(5);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[0] = incomingByte;       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[1] = incomingByte;       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[2] = incomingByte;       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[3] = incomingByte;       
+  }
+  Serial.println(ph_data.f_data);
+  //post data to server
+  //post(ph_data.f_data);
+
+  //here is return code
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);     
+  }
+  delay(1000);
+  //end
+
+  //temp 要求slave回傳溫度值
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(1);
   Wire.write(6);
@@ -144,19 +214,16 @@ void loop() {
     incomingByte = Wire.read();
     Serial.println(incomingByte);       
   }
-  
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(255);
   Wire.endTransmission();
   Wire.requestFrom(SLAVE_ADDRESS, 1);
   while (Wire.available())
   {
-    Serial.println("#####################");
     incomingByte = Wire.read();
     Serial.println(incomingByte);
     temp_data.b_data[0] = incomingByte;       
   }
-  
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(255);
   Wire.endTransmission();
@@ -167,7 +234,6 @@ void loop() {
     Serial.println(incomingByte);
     temp_data.b_data[1] = incomingByte;       
   }
-  
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(255);
   Wire.endTransmission();
@@ -178,7 +244,6 @@ void loop() {
     Serial.println(incomingByte);
     temp_data.b_data[2] = incomingByte;       
   }
-  
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(255);
   Wire.endTransmission();
@@ -190,8 +255,10 @@ void loop() {
     temp_data.b_data[3] = incomingByte;       
   }
   Serial.println(temp_data.f_data);
+  //post data to server
   post(temp_data.f_data);
 
+  //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(255);
   Wire.endTransmission();
@@ -199,12 +266,12 @@ void loop() {
   while (Wire.available())
   {
     incomingByte = Wire.read();
-    Serial.println(incomingByte);
-    Serial.println("#####################");       
+    Serial.println(incomingByte);     
   }
   delay(1000);
+  //end
  
-  //
+  //LED
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);//set
   Wire.write(5);//device
@@ -232,7 +299,7 @@ void loop() {
   }
   delay(3000);
   
-  //
+  //LED
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(5);
@@ -260,7 +327,7 @@ void loop() {
   }
   delay(3000);
   
-  //
+  //AQ_LED
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(4);
@@ -288,7 +355,7 @@ void loop() {
   }
   delay(2000);
   
-  //
+  //AQ_LED
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(2);
   Wire.write(4);
