@@ -14,7 +14,6 @@ datetimeInfo t;
 char buff[256];
 const int SLAVE_ADDRESS = 4; 
 byte incomingByte = 0;
-float ph_data;
 
 //transfer temp byte data
 typedef union Data {
@@ -22,14 +21,15 @@ typedef union Data {
   unsigned char b_data[4];
 }Data;
 Data temp_data;
+Data ph_data;
 
 void setup(){
   // put your setup code here, to run once:
   Wire.begin();
   LTask.begin();
   LWiFi.begin();
-  Serial.begin(BAUDRATE);
-  while(!Serial);
+  //Serial.begin(BAUDRATE);
+  //while(!Serial);
   // def. time setting
   t.year = 2015;
   t.mon = 10;
@@ -48,10 +48,10 @@ void setup(){
 }
 
 //HERE is post data to Amazon ec2
-void post(float temp, int model){
+void post(float val0, float val1){
   LDateTime.getTime(&t);
-  sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":%d,\"temp\":\"%f\"}]", 
-          t.year, t.mon, t.day, t.hour, t.min, t.sec, model, temp);
+  sprintf(buff, "[{\"uuid\":\"A8SPV2MUX7BVXZCP111A\",\"timestamp\":\"%d-%d-%d_%d:%d:%d\",\"sen_mask\":3,\"temp\":%f,\"ph\":%f}]", 
+          t.year, t.mon, t.day, t.hour, t.min, t.sec, val0, val1);
   Serial.println("Connecting to website...");
   String str(buff);
   String data = buff;
@@ -131,6 +131,57 @@ void loop() {
   }
   delay(1000);
 
+  //feeder on
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(2);
+  Wire.write(12);
+  Wire.write(1);
+  Wire.write(1);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
+  
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
+  delay(1000);
+  //feeder off
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(2);
+  Wire.write(12);
+  Wire.write(1);
+  Wire.write(0); //0
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
+  
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);       
+  }
+  delay(1000);
+
   //ph
   Wire.beginTransmission(SLAVE_ADDRESS);
   Wire.write(1);
@@ -152,10 +203,40 @@ void loop() {
   {
     incomingByte = Wire.read();
     Serial.println(incomingByte);
-    ph_data = incomingByte;       
+    ph_data.b_data[0] = incomingByte;       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[1] = incomingByte;       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[2] = incomingByte;       
+  }
+  Wire.beginTransmission(SLAVE_ADDRESS);
+  Wire.write(255);
+  Wire.endTransmission();
+  Wire.requestFrom(SLAVE_ADDRESS, 1);
+  while (Wire.available())
+  {
+    incomingByte = Wire.read();
+    Serial.println(incomingByte);
+    ph_data.b_data[3] = incomingByte;       
   }
   //*post data to server*
-  post(ph_data, 3);
+  //post(ph_data.f_data, 2);
 
   //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
@@ -225,7 +306,7 @@ void loop() {
   }
   Serial.println(temp_data.f_data);
   //post data to server
-  post(temp_data.f_data, 1);
+  post(temp_data.f_data, ph_data.f_data);
 
   //here is return code
   Wire.beginTransmission(SLAVE_ADDRESS);
@@ -352,3 +433,5 @@ void loop() {
   }
   delay(2000); 
 }
+
+

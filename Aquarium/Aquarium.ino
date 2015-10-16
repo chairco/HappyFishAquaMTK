@@ -2,8 +2,9 @@
 #include <DallasTemperature.h>
 #include <Wire.h>
 #include <Timer.h>
-
 //設定控制元件所需的指令
+
+#define FEEDER 12
 #define DOWNMOTOR 0
 #define UPMOTOR 1
 #define HEATER 2
@@ -13,9 +14,9 @@
 #define TEMPERATURE 6
 #define AQ_LED_CHANGE_SLOW 7
 #define FILTER_LED_CHANGE_SLOW 8
+#define PH_METER 9
 #define TEMP_QU 5
 #define LED_CHANGE_STAGE 100.0
-#define PH 9
 
 #define GET 3
 #define SET 1
@@ -31,21 +32,12 @@
 #define SET_SUCCESS 0
 #define GET_SUCCESS 128
 
-//add for PH sensor
-#define Offset 0.00            //deviation compensate
-#define LED 13
-#define samplingInterval 20
-#define printInterval 800
-#define ArrayLenth  40    //times of collection
-int pHArray[ArrayLenth];   //Store the average value of the sensor feedback
-int pHArrayIndex=0; 
-#define PhPin = A7;  //pH meter Analog output to Arduino Analog Input 7
-
 //設定IO PORT
 const int SLAVE_ADDRESS = 4;
 const int DS1820 = 2;
 const int downmotor = 4;
 const int upmotor = 7;
+const int feeder = 12;
 const int heater = 13;
 const int fog = 8;
 const int aquarium_led_r = 3;
@@ -54,8 +46,8 @@ const int aquarium_led_b = 6;
 const int filter_led_r = 9;
 const int filter_led_g = 10;
 const int filter_led_b = 11;
-const int water_h = A0;
-const int water_l = A1;
+const int water_h = A1;
+const int water_l = A2;
 
 float aq_led_r_duty = 12;
 float aq_led_g_duty = 12;
@@ -76,6 +68,7 @@ bool filter_led_change_slow = false;
 float filter_change_time = 0;
 
 int IO_state = 0;
+int feeder_state=0;
 int up_motor_state=0;
 int return_state = CMD_END;
 int temp_count = 0;
@@ -87,8 +80,8 @@ byte cmd_end;
 byte Temp;
 
 Timer led_timer;
-Timer ph_timer;
 Timer temp_timer;
+Timer ph_timer;
 Timer water_level;
 float filter_led_r_change_rate = 0;
 float filter_led_g_change_rate = 0;
@@ -97,22 +90,31 @@ float aq_led_r_change_rate = 0;
 float aq_led_g_change_rate = 0;
 float aq_led_b_change_rate = 0;
 
-typedef union Data{
+typedef union Data
+{
   float temperature;
   byte byte_temp[4];
 }Data;
 
 Data TEMP;
+Data PH;
+#define Offset 0.00            //deviation compensate
+#define ArrayLenth  120    //times of collection
+int pHArray[ArrayLenth];   //Store the average value of the sensor feedback
+int pHArrayIndex=0;    
+
 OneWire oneWire(DS1820);
 DallasTemperature Temperature(&oneWire);
 
-void setup(){
+void setup()
+{
   //建立SLAVE ADDRESS
   Wire.begin(SLAVE_ADDRESS);
   //建立I2C接收事件
   Wire.onReceive(receiveEvent);
   Wire.onRequest(requestEvent);
   //指定PIN3為輸出腳
+  pinMode(feeder, OUTPUT);
   pinMode(downmotor, OUTPUT);
   //digitalWrite(downmotor, 0);
   pinMode(upmotor, OUTPUT);
@@ -136,55 +138,10 @@ void setup(){
   //
   Serial.begin(9600);
   led_timer.every(1000/LED_CHANGE_STAGE, led_set_method);
-  ph_timer.every(1000,get_ph);
   temp_timer.every(1000,get_temp);
+  ph_timer.every(20, get_ph);
   water_level.every(1000,get_water_level);
 }
-
-void get_water_level(){
-  float water_val_h=0;
-  float water_val_l=0;
-  water_val_h=analogRead(water_h);
-  water_val_l=analogRead(water_l);
-  water_val_l=water_val_l;
- if(up_motor_state==1 && (water_val_h > water_val_l))
- {
-    digitalWrite(upmotor, 0);
- }
- else
- {
-    digitalWrite(upmotor, up_motor_state);
- }
-  Serial.println(water_val_h);
-  Serial.println(water_val_l);
-}
-
-void get_ph(){
-  static unsigned long samplingTime = millis();
-  static unsigned long printTime = millis();
-  static float pHValue,voltage;
-  if(millis()-samplingTime > samplingInterval)
-  {
-      pHArray[pHArrayIndex++]=analogRead(PhPin);
-      if(pHArrayIndex==ArrayLenth)pHArrayIndex=0;
-      voltage = avergearray(pHArray, ArrayLenth)*5.0/1024;
-      pHValue = 3.5*voltage+Offset;
-      samplingTime=millis();
-  }
-  if(millis() - printTime > printInterval)   //Every 800 milliseconds, print a numerical, convert the state of the LED indicator
-  {
-    /*
-    Serial.print("Voltage:");
-        Serial.print(voltage,2);
-        Serial.print("    pH value: ");
-    Serial.println(pHValue,2);
-        digitalWrite(LED,digitalRead(LED)^1);
-        printTime=millis();
-    */
-    Serial.println(pHValue,2)
-  }
-}
-
 double avergearray(int* arr, int number){
   int i;
   int max,min;
@@ -225,22 +182,71 @@ double avergearray(int* arr, int number){
   return avg;
 }
 
-void get_temp(){
+void get_ph()
+{
+  static unsigned long samplingTime = millis();
+  static unsigned long printTime = 0;
+  static float pHValue,voltage;
+
+  pHArray[pHArrayIndex++] = analogRead(A7) - 410;
+      
+  if(pHArrayIndex==ArrayLenth)pHArrayIndex=0;
+  voltage = avergearray(pHArray, ArrayLenth)*5.0/1024;
+  pHValue = 3.5*voltage+Offset;
+  printTime += 1;
+
+  if(printTime >= ArrayLenth)   //Every 800 milliseconds, print a numerical, convert the state of the LED indicator
+  {
+    PH.temperature = pHValue;
+    Serial.print("Voltage:");
+        Serial.print(voltage,2);
+        Serial.print("    pH value: ");
+    //Serial.println(pHValue,2);
+    Serial.println(PH.temperature,2);
+    printTime= 0;
+  }
+}
+
+void get_water_level()
+{
+  float water_val_h=0;
+  float water_val_l=0;
+  water_val_h=analogRead(water_h);
+  water_val_l=analogRead(water_l);
+  water_val_l=water_val_l*1.1;
+ if(up_motor_state==1 && (water_val_h < water_val_l))
+ {
+    digitalWrite(upmotor, 0);
+    
+ }
+ else
+ {
+    digitalWrite(upmotor, up_motor_state);
+    Serial.println(up_motor_state);
+ }
+  Serial.println(water_val_h);
+  Serial.println(water_val_l);
+  
+}
+void get_temp()
+{
  Temperature.requestTemperatures();
  TEMP.temperature = Temperature.getTempCByIndex(0);
  //Serial.println(TEMP.temperature);
 }
-
-void loop(){
- // 讀取溫度
+void loop()
+{
+  // 讀取溫度
+  
  temp_timer.update();
- ph_timer.update();
  led_timer.update();
+ ph_timer.update();
  water_level.update();
  //delay_method();
-}
 
-void led_set_method(){
+}
+void led_set_method()
+{
  if(aq_led_change_slow == true)
  {
       //Serial.println(aq_led_r_old_duty);
@@ -318,17 +324,18 @@ void led_set_method(){
       analogWrite(filter_led_b , filter_led_b_old_duty);
       
  }
-}
 
-void clear_buffer(){
+}
+void clear_buffer()
+{
   byte temp;
   while(Wire.available())
   {
     temp=Wire.read();
   }
 }
-
-void receiveEvent(int howMany){
+void receiveEvent(int howMany)
+{
   //讀取master傳過來的指令
   requestRegister = Wire.read();
   //判斷指令並做對應的活動
@@ -341,6 +348,29 @@ void receiveEvent(int howMany){
         switch(ID)
         {
           case TEMPERATURE:
+            Quantity = Wire.read();
+            switch(Quantity)
+            {
+              case TEMP_QU:
+                cmd_end = Wire.read();
+                switch(cmd_end)
+                {
+                  case CMD_END:
+                    return_state = GET_SUCCESS + TEMP_QU;
+                    break;
+                  default:
+                    return_state = END_ERROR;
+                    clear_buffer();
+                    break;
+                }
+                break;
+             default:
+                return_state = QU_ERROR;
+                clear_buffer();
+                break;
+           }
+           break;
+          case PH_METER:
             Quantity = Wire.read();
             switch(Quantity)
             {
@@ -455,6 +485,32 @@ void receiveEvent(int howMany){
                   case CMD_END:
                     return_state = SET_SUCCESS;
                     digitalWrite(heater, IO_state);
+                    break;
+                  default:
+                    return_state = DATA_ERROR;
+                    clear_buffer();
+                    break;
+                }
+                break;
+              default:
+                return_state = QU_ERROR;
+                clear_buffer();
+                break;
+            }
+            break;
+          case FEEDER:
+            Quantity = Wire.read();
+            switch(Quantity)
+            {
+              case SET:
+                IO_state = Wire.read();
+                cmd_end = Wire.read();
+                switch(cmd_end)
+                {
+                  case CMD_END:
+                    return_state = SET_SUCCESS;
+                    feeder_state = IO_state;
+                    digitalWrite(feeder, IO_state);
                     break;
                   default:
                     return_state = DATA_ERROR;
@@ -641,6 +697,31 @@ void receiveEvent(int howMany){
             break;
         }
         break;
+        
+      case PH_METER:
+        switch(requestRegister)
+        {
+          case CMD_END:
+            if(temp_count < 4)
+            {
+              return_state = PH.byte_temp[temp_count];
+              temp_count = temp_count+1;
+            }
+            else
+            {
+              return_state = CMD_END;
+              temp_count = temp_count+1;
+            }
+            break;
+          default:
+            return_state = CMD_ERROR;
+            temp_count = 0;
+            ID = ID_ERROR;
+            clear_buffer();
+            break;
+        }
+        break;
+        
       default:
         switch(requestRegister)
         {
@@ -656,8 +737,8 @@ void receiveEvent(int howMany){
     }
   }
 }
-
-void requestEvent(){
+void requestEvent()
+{
   //byte return_value = 0;
   Wire.write(return_state);
   switch(ID)
@@ -673,9 +754,22 @@ void requestEvent(){
         return_state = CMD_END;
       }
       break;
+    case PH_METER:
+      if(temp_count <= 4)
+      {
+        return_state = GET_SUCCESS + TEMP_QU;
+      }  
+      else
+      {
+        temp_count = 0;
+        return_state = CMD_END;
+      }
+      break;
     default:
       break;
   }
+  
   //選擇回傳的值
+ 
 }
 
